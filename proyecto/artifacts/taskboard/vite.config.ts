@@ -28,6 +28,10 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  // ESTO LE ENSEÑA A VITE TU API EN RENDER
+  define: {
+    "process.env.VITE_API_URL": JSON.stringify(process.env.VITE_API_URL),
+  },
   plugins: [
     react(),
     tailwindcss(),
