@@ -1,0 +1,797 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: TaskBoard - Trello-like project management API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: boards
+    description: Board operations
+  - name: cards
+    description: Card operations
+  - name: members
+    description: Member management
+  - name: invitations
+    description: Invitation management
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+
+  /boards:
+    get:
+      operationId: listBoards
+      tags: [boards]
+      summary: List boards the current user belongs to
+      responses:
+        "200":
+          description: List of boards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BoardSummary"
+    post:
+      operationId: createBoard
+      tags: [boards]
+      summary: Create a new board
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BoardInput"
+      responses:
+        "201":
+          description: Board created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Board"
+
+  /boards/{boardId}:
+    get:
+      operationId: getBoard
+      tags: [boards]
+      summary: Get board with all columns and cards
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Board detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Board"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateBoard
+      tags: [boards]
+      summary: Update board settings
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BoardUpdate"
+      responses:
+        "200":
+          description: Updated board
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Board"
+    delete:
+      operationId: deleteBoard
+      tags: [boards]
+      summary: Delete a board
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /boards/{boardId}/stats:
+    get:
+      operationId: getBoardStats
+      tags: [boards]
+      summary: Get board statistics (counts per column, member count)
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Board stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardStats"
+
+  /boards/{boardId}/activity:
+    get:
+      operationId: getBoardActivity
+      tags: [boards]
+      summary: Get recent board activity feed
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Recent activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+
+  /boards/{boardId}/members:
+    get:
+      operationId: listBoardMembers
+      tags: [members]
+      summary: List members of a board
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of board members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BoardMember"
+
+  /boards/{boardId}/members/{userId}:
+    delete:
+      operationId: removeBoardMember
+      tags: [members]
+      summary: Remove a member from a board
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Member removed
+
+  /boards/{boardId}/invitations:
+    post:
+      operationId: inviteMember
+      tags: [invitations]
+      summary: Invite a user to a board by username
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationInput"
+      responses:
+        "201":
+          description: Invitation sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+
+  /invitations:
+    get:
+      operationId: listMyInvitations
+      tags: [invitations]
+      summary: List pending invitations for the current user
+      responses:
+        "200":
+          description: Pending invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invitation"
+
+  /invitations/{invitationId}/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [invitations]
+      summary: Accept a board invitation
+      parameters:
+        - name: invitationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardMember"
+
+  /invitations/{invitationId}/decline:
+    post:
+      operationId: declineInvitation
+      tags: [invitations]
+      summary: Decline a board invitation
+      parameters:
+        - name: invitationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Declined
+
+  /boards/{boardId}/cards:
+    get:
+      operationId: listCards
+      tags: [cards]
+      summary: List all cards for a board
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cards list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Card"
+    post:
+      operationId: createCard
+      tags: [cards]
+      summary: Create a new card on a board
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardInput"
+      responses:
+        "201":
+          description: Card created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+
+  /cards/{cardId}:
+    get:
+      operationId: getCard
+      tags: [cards]
+      summary: Get card detail including attachments and links
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Card detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCard
+      tags: [cards]
+      summary: Update a card (title, description, status, position)
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardUpdate"
+      responses:
+        "200":
+          description: Updated card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+    delete:
+      operationId: deleteCard
+      tags: [cards]
+      summary: Delete a card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /cards/{cardId}/links:
+    post:
+      operationId: addCardLink
+      tags: [cards]
+      summary: Add an external link to a card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardLinkInput"
+      responses:
+        "201":
+          description: Link added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardLink"
+
+  /cards/{cardId}/links/{linkId}:
+    delete:
+      operationId: removeCardLink
+      tags: [cards]
+      summary: Remove an external link from a card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: linkId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Link removed
+
+  /cards/{cardId}/attachments/{attachmentId}:
+    delete:
+      operationId: removeCardAttachment
+      tags: [cards]
+      summary: Remove an attachment from a card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Attachment removed
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: ["string", "null"]
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImage:
+          type: ["string", "null"]
+        isAuthenticated:
+          type: boolean
+      required: [id, isAuthenticated]
+
+    BoardSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        color:
+          type: string
+        memberCount:
+          type: integer
+        cardCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        role:
+          type: string
+      required: [id, name, color, memberCount, cardCount, createdAt, updatedAt, role]
+
+    Board:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        color:
+          type: string
+        ownerId:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/Card"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/BoardMember"
+      required: [id, name, color, ownerId, createdAt, updatedAt, cards, members]
+
+    BoardInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        color:
+          type: string
+      required: [name]
+
+    BoardUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        color:
+          type: string
+
+    BoardStats:
+      type: object
+      properties:
+        boardId:
+          type: integer
+        todoCount:
+          type: integer
+        inProgressCount:
+          type: integer
+        doneCount:
+          type: integer
+        totalCards:
+          type: integer
+        memberCount:
+          type: integer
+      required: [boardId, todoCount, inProgressCount, doneCount, totalCards, memberCount]
+
+    ActivityEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        boardId:
+          type: integer
+        cardId:
+          type: ["integer", "null"]
+        cardTitle:
+          type: ["string", "null"]
+        userId:
+          type: string
+        userDisplayName:
+          type: string
+        action:
+          type: string
+        detail:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, boardId, userId, userDisplayName, action, createdAt]
+
+    BoardMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        boardId:
+          type: integer
+        userId:
+          type: string
+        username:
+          type: ["string", "null"]
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImage:
+          type: ["string", "null"]
+        role:
+          type: string
+        joinedAt:
+          type: string
+      required: [id, boardId, userId, role, joinedAt]
+
+    InvitationInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+      required: [username]
+
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: integer
+        boardId:
+          type: integer
+        boardName:
+          type: string
+        invitedByUsername:
+          type: ["string", "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+      required: [id, boardId, boardName, status, createdAt]
+
+    Card:
+      type: object
+      properties:
+        id:
+          type: integer
+        boardId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        position:
+          type: integer
+        assigneeId:
+          type: ["string", "null"]
+        assigneeUsername:
+          type: ["string", "null"]
+        assigneeImage:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+        attachmentCount:
+          type: integer
+        linkCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, boardId, title, status, position, attachmentCount, linkCount, createdAt, updatedAt]
+
+    CardDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        boardId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        position:
+          type: integer
+        assigneeId:
+          type: ["string", "null"]
+        assigneeUsername:
+          type: ["string", "null"]
+        assigneeImage:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardAttachment"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardLink"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, boardId, title, status, position, attachments, links, createdAt, updatedAt]
+
+    CardInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        assigneeId:
+          type: string
+        dueDate:
+          type: string
+      required: [title]
+
+    CardUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        position:
+          type: integer
+        assigneeId:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+
+    CardLink:
+      type: object
+      properties:
+        id:
+          type: integer
+        cardId:
+          type: integer
+        url:
+          type: string
+        title:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, cardId, url, createdAt]
+
+    CardLinkInput:
+      type: object
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+      required: [url]
+
+    CardAttachment:
+      type: object
+      properties:
+        id:
+          type: integer
+        cardId:
+          type: integer
+        filename:
+          type: string
+        originalName:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+        url:
+          type: string
+        createdAt:
+          type: string
+      required: [id, cardId, filename, originalName, mimeType, size, url, createdAt]
