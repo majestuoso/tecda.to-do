@@ -72,7 +72,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     }
   };
 
-  // ⚡ FUNCIÓN CON DIAGNÓSTICO INCORPORADO
+  // ⚡ FUNCIÓN CON ACTUALIZACIÓN LOCAL INMEDIATA
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
@@ -95,10 +95,27 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
       
       console.log("✅ 2. Render respondió. Datos devueltos por el servidor:", res.data);
 
+      // 🛠️ Si el backend nos devolvió la tarea, la inyectamos directamente en el estado local
+      if (res.data && (res.data.id || res.data._id)) {
+        const nuevaTarea: Task = {
+          id: res.data.id || res.data._id,
+          title: res.data.title || taskData.title,
+          status: res.data.status || 'todo',
+          color: res.data.color || '#ffffff',
+          description: res.data.description || '',
+          assignedTo: res.data.assignedTo || taskData.assignedTo,
+          link: res.data.link || '',
+          fileUrl: res.data.fileUrl || ''
+        };
+
+        // Forzamos que se dibuje en pantalla al instante
+        setTasks(prevTasks => [...prevTasks, nuevaTarea]);
+      }
+
       setNewTaskTitle('');
       setTopAssignee(''); 
       
-      console.log("🔄 3. Ejecutando fetchTasks() para refrescar la pantalla...");
+      console.log("🔄 3. Sincronizando secundariamente con el servidor...");
       await fetchTasks();
       
     } catch (err) {
@@ -295,7 +312,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
       </div>
 
-      {/* --- MODAL FLOTANTE COMPLETO --- */}
+      {/* --- MODAL FLOTANTE --- */}
       {selectedTask && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', width: '500px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 5px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
