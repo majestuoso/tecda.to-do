@@ -12,6 +12,8 @@ interface Task {
   status: 'todo' | 'in_progress' | 'done';
   color?: string;
   assignedTo?: string;
+  link?: string;      // 🔗 Enlace guardado
+  fileUrl?: string;   // 📁 Archivo adjunto
 }
 
 interface Member {
@@ -31,11 +33,14 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const [progressBg, setProgressBg] = useState('#ebecf0');
   const [doneBg, setDoneBg] = useState('#ebecf0');
 
-  // --- ESTADOS PARA LA VENTANA DE TAREA (MODAL) ---
+  // --- ESTADOS AMPLIADOS PARA LA VENTANA FLOTANTE (MODAL GRANDE) ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalDescription, setModalDescription] = useState('');
+  const [modalStatus, setModalStatus] = useState<'todo' | 'in_progress' | 'done'>('todo');
   const [modalColor, setModalColor] = useState('#ffffff');
   const [modalAssignee, setModalAssignee] = useState('');
+  const [modalLink, setModalLink] = useState('');
+  const [modalFile, setModalFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (workspaceId) {
@@ -76,7 +81,9 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
       status: 'todo',
       color: '#ffffff',
       description: '',
-      assignedTo: ''
+      assignedTo: '',
+      link: '',
+      fileUrl: ''
     };
 
     try {
@@ -117,18 +124,31 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const openTaskModal = (task: Task) => {
     setSelectedTask(task);
     setModalDescription(task.description || '');
+    setModalStatus(task.status);
     setModalColor(task.color || '#ffffff');
-    setModalAssignee(task.assignedTo || ''); // Carga correctamente el ID del miembro asignado actual
+    setModalAssignee(task.assignedTo || '');
+    setModalLink(task.link || '');
+    setModalFile(null); // Resetea el input de archivo al abrir
   };
 
   const handleSaveModalChanges = async () => {
     if (!selectedTask) return;
     try {
+      // Simulación de carga/manejador de archivo si se adjunta uno nuevo
+      let finalFileUrl = selectedTask.fileUrl || '';
+      if (modalFile) {
+        finalFileUrl = `📁 Adjunto: ${modalFile.name}`; 
+      }
+
       await axios.patch(`${API_URL}/tasks/${selectedTask.id}`, {
         description: modalDescription,
+        status: modalStatus,
         color: modalColor,
-        assignedTo: modalAssignee // Guarda el ID seleccionado en la base de datos
+        assignedTo: modalAssignee,
+        link: modalLink,
+        fileUrl: finalFileUrl
       });
+      
       setSelectedTask(null);
       fetchTasks();
     } catch (err) {
@@ -176,9 +196,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         <div className="kanban-column" style={{ backgroundColor: todoBg, padding: '12px', borderRadius: '8px', width: '250px', minHeight: '400px', transition: 'background-color 0.3s', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0, color: '#c0392b', fontSize: '14px', fontWeight: 'bold' }}>🔴 Por Hacer ({todoTasks.length})</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <input type="color" value={todoBg} onChange={e => setTodoBg(e.target.value)} style={{ width: '18px', height: '18px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
-            </div>
+            <input type="color" value={todoBg} onChange={e => setTodoBg(e.target.value)} style={{ width: '18px', height: '18px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {todoTasks.map(t => {
@@ -204,9 +222,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         <div className="kanban-column" style={{ backgroundColor: progressBg, padding: '12px', borderRadius: '8px', width: '250px', minHeight: '400px', transition: 'background-color 0.3s', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0, color: '#d35400', fontSize: '14px', fontWeight: 'bold' }}>🟠 En Proceso ({inProgressTasks.length})</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <input type="color" value={progressBg} onChange={e => setProgressBg(e.target.value)} style={{ width: '18px', height: '18px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
-            </div>
+            <input type="color" value={progressBg} onChange={e => setProgressBg(e.target.value)} style={{ width: '18px', height: '18px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {inProgressTasks.map(t => {
@@ -232,9 +248,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         <div className="kanban-column" style={{ backgroundColor: doneBg, padding: '12px', borderRadius: '8px', width: '250px', minHeight: '400px', transition: 'background-color 0.3s', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0, color: '#27ae60', fontSize: '14px', fontWeight: 'bold' }}>🟢 Terminado ({doneTasks.length})</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <input type="color" value={doneBg} onChange={e => setDoneBg(e.target.value)} style={{ width: '18px', height: '18px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
-            </div>
+            <input type="color" value={doneBg} onChange={e => setDoneBg(e.target.value)} style={{ width: '18px', height: '18px', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {doneTasks.map(t => {
@@ -258,66 +272,113 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
       </div>
 
-      {/* --- MODAL FLOTANTE DE EDICIÓN --- */}
+      {/* ==========================================================
+          💻 MODAL FLOTANTE FORMATO GRANDE (PRODUCCIÓN COMPLETO)
+          ========================================================== */}
       {selectedTask && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', width: '400px', maxWidth: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', width: '500px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 5px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '16px' }}>📝 Editar Tarea</h3>
-              <button onClick={() => setSelectedTask(null)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>&times;</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+              <h2 style={{ margin: 0, fontSize: '18px', color: '#2c3e50' }}>⚙️ Configuración de Tarea</h2>
+              <button onClick={() => setSelectedTask(null)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#aaa' }}>&times;</button>
             </div>
 
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#333' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1a6fa8', backgroundColor: '#f0f7fc', padding: '10px', borderRadius: '4px' }}>
               {selectedTask.title}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>Descripción de la actividad:</label>
-              <textarea 
-                rows={3}
-                placeholder="Detallá los requisitos de esta tarea..."
-                value={modalDescription}
-                onChange={e => setModalDescription(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '13px' }}
-              />
-            </div>
+            {/* FILA 1: Asignar Miembro y Cambiar Estado */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Asignar a:</label>
+                <select 
+                  value={modalAssignee}
+                  onChange={e => setModalAssignee(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff' }}
+                >
+                  <option value="">Sin asignar (Nadie)</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Selector corregido pasándole m.id como value */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Asignar a un miembro:</label>
-              <select 
-                value={modalAssignee}
-                onChange={e => setModalAssignee(e.target.value)}
-                style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff' }}
-              >
-                <option value="">Sin asignar (Nadie)</option>
-                {members.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🎨 Color de fondo de la tarjeta:</label>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <input 
-                  type="color" 
-                  value={modalColor}
-                  onChange={e => setModalColor(e.target.value)}
-                  style={{ width: '35px', height: '30px', padding: 0, border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '12px', color: '#666' }}>Elegí el color de la tarjeta</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📊 Estado actual:</label>
+                <select 
+                  value={modalStatus}
+                  onChange={e => setModalStatus(e.target.value as 'todo' | 'in_progress' | 'done')}
+                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff' }}
+                >
+                  <option value="todo">🔴 Por Hacer</option>
+                  <option value="in_progress">🟠 En Proceso</option>
+                  <option value="done">🟢 Terminado</option>
+                </select>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-              <button onClick={() => setSelectedTask(null)} style={{ padding: '6px 12px', backgroundColor: '#7f8c8d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
+            {/* CAMPO: Notas y Descripciones Ampliadas */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📝 Notas / Detalles de la actividad:</label>
+              <textarea 
+                rows={4}
+                placeholder="Escribí notas detalladas, requerimientos o comentarios sobre el avance de esta tarea..."
+                value={modalDescription}
+                onChange={e => setModalDescription(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '13px', lineHeight: '1.4' }}
+              />
+            </div>
+
+            {/* CAMPO: Pegar Enlaces */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🔗 Pegar Enlace externo (Drive, GitHub, Webs):</label>
+              <input 
+                type="url"
+                placeholder="https://ejemplo.com/recurso"
+                value={modalLink}
+                onChange={e => setModalLink(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }}
+              />
+            </div>
+
+            {/* CAMPO GRANDE: Adjuntar Archivos */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: '#f8f9fa', padding: '12px', borderRadius: '6px', border: '1px dashed #ccc' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📁 Adjuntar documento o captura (Formato Grande):</label>
+              <input 
+                type="file"
+                onChange={e => {
+                  if (e.target.files && e.target.files[0]) {
+                    setModalFile(e.target.files[0]);
+                  }
+                }}
+                style={{ fontSize: '13px', marginTop: '5px', cursor: 'pointer' }}
+              />
+              {selectedTask.fileUrl && (
+                <div style={{ marginTop: '5px', fontSize: '11px', color: '#27ae60', fontWeight: 'bold' }}>
+                  {selectedTask.fileUrl}
+                </div>
+              )}
+            </div>
+
+            {/* CAMPO: Color de fondo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🎨 Color de tarjeta:</label>
+              <input 
+                type="color" 
+                value={modalColor}
+                onChange={e => setModalColor(e.target.value)}
+                style={{ width: '40px', height: '30px', padding: 0, border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '12px', color: '#666' }}>Personalizar etiqueta visual</span>
+            </div>
+
+            {/* Botonera inferior */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
+              <button onClick={() => setSelectedTask(null)} style={{ padding: '8px 14px', backgroundColor: '#7f8c8d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
                 Cancelar
               </button>
-              <button onClick={handleSaveModalChanges} style={{ padding: '6px 14px', backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+              <button onClick={handleSaveModalChanges} style={{ padding: '8px 16px', backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
                 Guardar Cambios
               </button>
             </div>
