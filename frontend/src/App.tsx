@@ -3,9 +3,9 @@ import axios from 'axios';
 import Board from './Board';
 import './index.css';
 
-// 🌐 CONFIGURACIÓN DE URLS (Modificá esto cuando subas a internet)
-const APP_URL = "http://localhost:5173"; // Cambialo por el link de Netlify cuando lo tengas
-const API_URL = "http://localhost:5000"; // Cambialo por el link de Render cuando lo tengas
+// 🌐 CONFIGURACIÓN DE URLS (Producción en internet)
+const APP_URL = "https://tecda-workspace.netlify.app"; 
+const API_URL = "http://localhost:5000"; // Cambialo por el link de Render cuando lo tengamos
 
 export default function App() {
   // --- ESTADOS DE AUTENTICACIÓN Y SESIÓN ---
