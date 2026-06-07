@@ -11,7 +11,7 @@ interface Task {
   description?: string;
   status: 'todo' | 'in_progress' | 'done';
   color?: string;
-  assignedTo?: string; // ID del miembro asignado según el modelo del Backend
+  assignedTo?: string; 
   link?: string;      
   fileUrl?: string;   
 }
@@ -27,6 +27,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [topAssignee, setTopAssignee] = useState(''); // 👤 Estado para el miembro elegido arriba
 
   // --- ESTADOS PARA COLORES DE LAS COLUMNAS ---
   const [todoBg, setTodoBg] = useState('#ebecf0');
@@ -38,7 +39,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const [modalDescription, setModalDescription] = useState('');
   const [modalStatus, setModalStatus] = useState<'todo' | 'in_progress' | 'done'>('todo');
   const [modalColor, setModalColor] = useState('#ffffff');
-  const [modalAssignee, setModalAssignee] = useState(''); // Maneja el id del miembro elegido
+  const [modalAssignee, setModalAssignee] = useState(''); 
   const [modalLink, setModalLink] = useState('');
   const [modalFile, setModalFile] = useState<File | null>(null);
 
@@ -74,6 +75,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
+    // Vinculamos el miembro elegido arriba (topAssignee) a la tarea nueva
     const taskData = {
       id: 't_' + Date.now().toString(),
       workspaceId,
@@ -81,7 +83,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
       status: 'todo',
       color: '#ffffff',
       description: '',
-      assignedTo: '', // Se crea inicialmente sin nadie asignado
+      assignedTo: topAssignee, 
       link: '',
       fileUrl: ''
     };
@@ -89,6 +91,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     try {
       await axios.post(`${API_URL}/tasks`, taskData);
       setNewTaskTitle('');
+      setTopAssignee(''); // Limpiamos el selector superior tras añadir
       fetchTasks();
     } catch (err) {
       console.error("Error al crear tarea:", err);
@@ -126,7 +129,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     setModalDescription(task.description || '');
     setModalStatus(task.status);
     setModalColor(task.color || '#ffffff');
-    setModalAssignee(task.assignedTo || ''); // Mapea el ID de asignación guardado
+    setModalAssignee(task.assignedTo || ''); 
     setModalLink(task.link || '');
     setModalFile(null);
   };
@@ -139,18 +142,17 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         finalFileUrl = `📁 Adjunto: ${modalFile.name}`; 
       }
 
-      // Sincronizamos los nombres exactos de los campos con lo que Render espera recibir
       await axios.patch(`${API_URL}/tasks/${selectedTask.id}`, {
         description: modalDescription,
         status: modalStatus,
         color: modalColor,
-        assignedTo: modalAssignee, // Pasamos el ID seleccionado al Backend
+        assignedTo: modalAssignee, 
         link: modalLink,
         fileUrl: finalFileUrl
       });
       
       setSelectedTask(null);
-      fetchTasks(); // Volvemos a pedir las tareas actualizadas a Render
+      fetchTasks(); 
     } catch (err) {
       console.error("Error al guardar detalles de la tarea:", err);
     }
@@ -162,17 +164,31 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="board-container" style={{ width: '100%', overflowX: 'auto' }}>
-      {/* Barra superior de acciones */}
+      
+      {/* 🚀 BARRA SUPERIOR DE ACCIONES CON ASIGNACIÓN INCORPORADA */}
       <div style={{ display: 'flex', gap: '30px', marginBottom: '25px', flexWrap: 'wrap', maxWidth: '1000px' }}>
-        <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', flex: '1', minWidth: '260px' }}>
+        <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', flex: '1', minWidth: '350px' }}>
           <input 
             type="text" 
             placeholder="Escribí una nueva tarea..." 
             value={newTaskTitle}
             onChange={e => setNewTaskTitle(e.target.value)}
-            style={{ flex: 1, padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px' }}
+            style={{ flex: 2, padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px' }}
           />
-          <button type="submit" style={{ padding: '8px 16px', backgroundColor: '#1a6fa8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+          
+          {/* Selector de Miembros arriba restablecido */}
+          <select
+            value={topAssignee}
+            onChange={e => setTopAssignee(e.target.value)}
+            style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff', color: '#333', cursor: 'pointer' }}
+          >
+            <option value="">Asignar a...</option>
+            {members.map(m => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+
+          <button type="submit" style={{ padding: '8px 16px', backgroundColor: '#1a6fa8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', whiteSpace: 'nowrap' }}>
             + Añadir
           </button>
         </form>
@@ -189,7 +205,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
 
-      {/* Columnas Kanban */}
+      {/* Columnas Kanban Delgadas */}
       <div className="kanban-grid" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         
         {/* Columna: Por Hacer */}
@@ -272,7 +288,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
       </div>
 
-      {/* --- MODAL FLOTANTE FORMATO GRANDE --- */}
+      {/* --- MODAL FLOTANTE COMPLETO FORMATO GRANDE --- */}
       {selectedTask && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', width: '500px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 5px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -286,14 +302,13 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               {selectedTask.title}
             </div>
 
-            {/* SELECCIÓN DE MIEMBRO Y ESTADO */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Asignar a un colaborador:</label>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Reasignar colaborador:</label>
                 <select 
                   value={modalAssignee}
                   onChange={e => setModalAssignee(e.target.value)}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff', color: '#333' }}
+                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff' }}
                 >
                   <option value="">Sin asignar (Nadie)</option>
                   {members.map(m => (
@@ -316,7 +331,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               </div>
             </div>
 
-            {/* CAMPO: Notas */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📝 Notas / Detalles de la actividad:</label>
               <textarea 
@@ -328,7 +342,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               />
             </div>
 
-            {/* CAMPO: Enlaces */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🔗 Pegar Enlace externo (Drive, GitHub, Webs):</label>
               <input 
@@ -340,7 +353,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               />
             </div>
 
-            {/* CAMPO: Adjuntar Archivos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: '#f8f9fa', padding: '12px', borderRadius: '6px', border: '1px dashed #ccc' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📁 Adjuntar documento o captura (Formato Grande):</label>
               <input 
@@ -359,7 +371,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               )}
             </div>
 
-            {/* CAMPO: Color */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🎨 Color de tarjeta:</label>
               <input 
@@ -370,7 +381,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               />
             </div>
 
-            {/* Botonera inferior */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
               <button onClick={() => setSelectedTask(null)} style={{ padding: '8px 14px', backgroundColor: '#7f8c8d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
                 Cancelar
