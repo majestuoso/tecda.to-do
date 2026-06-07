@@ -118,7 +118,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     setSelectedTask(task);
     setModalDescription(task.description || '');
     setModalColor(task.color || '#ffffff');
-    setModalAssignee(task.assignedTo || '');
+    setModalAssignee(task.assignedTo || ''); // Carga correctamente el ID del miembro asignado actual
   };
 
   const handleSaveModalChanges = async () => {
@@ -127,7 +127,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
       await axios.patch(`${API_URL}/tasks/${selectedTask.id}`, {
         description: modalDescription,
         color: modalColor,
-        assignedTo: modalAssignee
+        assignedTo: modalAssignee // Guarda el ID seleccionado en la base de datos
       });
       setSelectedTask(null);
       fetchTasks();
@@ -169,7 +169,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
 
-      {/* Columnas Kanban más delgadas */}
+      {/* Columnas Kanban */}
       <div className="kanban-grid" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         
         {/* Columna: Por Hacer */}
@@ -283,16 +283,19 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               />
             </div>
 
+            {/* Selector corregido pasándole m.id como value */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Asignar a un miembro:</label>
               <select 
                 value={modalAssignee}
                 onChange={e => setModalAssignee(e.target.value)}
-                style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }}
+                style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff' }}
               >
                 <option value="">Sin asignar (Nadie)</option>
                 {members.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
                 ))}
               </select>
             </div>
