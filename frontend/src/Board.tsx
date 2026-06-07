@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './index.css';
 
-// 🌐 CONFIGURACIÓN DE URL (Producción en Render)
+// 🌐 CONFIGURACIÓN DE URL (Producción en Render - ¡No cambiar por Netlify!)
 const API_URL = "https://tecda-backend.onrender.com";
 
 interface Task {
@@ -27,7 +27,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [topAssignee, setTopAssignee] = useState(''); // 👤 Estado para el miembro elegido arriba
+  const [topAssignee, setTopAssignee] = useState(''); 
 
   // --- ESTADOS PARA COLORES DE LAS COLUMNAS ---
   const [todoBg, setTodoBg] = useState('#ebecf0');
@@ -71,30 +71,34 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     }
   };
 
+  // ⚡ FUNCIÓN ARREGLADA SINCRO CON RENDER
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    // Vinculamos el miembro elegido arriba (topAssignee) a la tarea nueva
+    // Dejamos que el Backend maneje el ID para que no falle la inserción
     const taskData = {
-      id: 't_' + Date.now().toString(),
       workspaceId,
       title: newTaskTitle.trim(),
       status: 'todo',
       color: '#ffffff',
       description: '',
-      assignedTo: topAssignee, 
+      assignedTo: topAssignee || '', 
       link: '',
       fileUrl: ''
     };
 
     try {
+      // Mandamos los datos limpios a Render
       await axios.post(`${API_URL}/tasks`, taskData);
       setNewTaskTitle('');
-      setTopAssignee(''); // Limpiamos el selector superior tras añadir
+      setTopAssignee(''); 
+      
+      // Forzamos la actualización inmediata de las columnas
       fetchTasks();
     } catch (err) {
       console.error("Error al crear tarea:", err);
+      alert("No se pudo guardar la tarea en Render. Revisá los logs del backend.");
     }
   };
 
@@ -165,7 +169,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="board-container" style={{ width: '100%', overflowX: 'auto' }}>
       
-      {/* 🚀 BARRA SUPERIOR DE ACCIONES CON ASIGNACIÓN INCORPORADA */}
+      {/* 🚀 BARRA SUPERIOR */}
       <div style={{ display: 'flex', gap: '30px', marginBottom: '25px', flexWrap: 'wrap', maxWidth: '1000px' }}>
         <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', flex: '1', minWidth: '350px' }}>
           <input 
@@ -176,7 +180,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
             style={{ flex: 2, padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px' }}
           />
           
-          {/* Selector de Miembros arriba restablecido */}
           <select
             value={topAssignee}
             onChange={e => setTopAssignee(e.target.value)}
@@ -205,7 +208,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
 
-      {/* Columnas Kanban Delgadas */}
+      {/* Columnas Kanban */}
       <div className="kanban-grid" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         
         {/* Columna: Por Hacer */}
@@ -288,7 +291,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
       </div>
 
-      {/* --- MODAL FLOTANTE COMPLETO FORMATO GRANDE --- */}
+      {/* --- MODAL FLOTANTE --- */}
       {selectedTask && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', width: '500px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 5px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
