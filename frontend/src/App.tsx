@@ -3,9 +3,10 @@ import axios from 'axios';
 import Board from './Board';
 import './index.css';
 
-// 🌐 CONFIGURACIÓN DE URLS (Producción en internet)
+// 🌐 CONFIGURACIÓN DE URLS
 const APP_URL = "https://tecda-workspace.netlify.app"; 
-const API_URL = "https://tecda-backend.onrender.com"; // Cambialo por el link de Render cuando lo tengamos
+const API_URL = "https://tecda-backend.onrender.com";
+// 🌐 CONFIGURACIÓN PARA USO LOCAL
 
 export default function App() {
   // --- ESTADOS DE AUTENTICACIÓN Y SESIÓN ---
@@ -82,7 +83,6 @@ export default function App() {
     }
   };
 
-  // --- LÓGICA DE ENTRADA / REGISTRO ---
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -116,7 +116,6 @@ export default function App() {
     localStorage.removeItem('user');
   };
 
-  // --- ACCIONES DE ESPACIOS DE TRABAJO ---
   const addWs = async () => {
     if (!user) return;
     const name = prompt("Nombre del nuevo espacio:");
@@ -133,7 +132,6 @@ export default function App() {
     }
   };
 
-  // Permite al colaborador unirse usando el código explicativo
   const joinWithCode = async () => {
     if (!user) return;
     const code = prompt("Ingresá el código del espacio de trabajo:");
@@ -167,35 +165,39 @@ export default function App() {
     }
   };
 
+  // --- MODIFICACIÓN: EDITAR WS CON ACTUALIZACIÓN DE ESTADO ---
   const editWs = async (e: React.MouseEvent, ws: any) => {
     e.stopPropagation();
     const newName = prompt("Nuevo nombre:", ws.name);
-    if (!newName) return;
+    if (!newName || newName === ws.name) return;
     try {
       await axios.patch(`${API_URL}/workspaces/${ws.id}`, { name: newName });
+      
+      // Actualizamos la lista de workspaces
       setWorkspaces(workspaces.map(w => w.id === ws.id ? { ...w, name: newName } : w));
-      if (selectedWs?.id === ws.id) setSelectedWs({ ...selectedWs, name: newName });
+      
+      // Si el seleccionado es el que editamos, actualizamos selectedWs para refrescar la UI
+      if (selectedWs?.id === ws.id) {
+        setSelectedWs({ ...selectedWs, name: newName });
+      }
     } catch (err) {
       console.error(err);
+      alert("Error al actualizar el nombre.");
     }
   };
 
-  // --- Arma el texto instructivo completo con formato de WhatsApp para colaboradores ---
   const handleCopyCode = async (code: string, workspaceName: string) => {
     const mensajeCompleto = `📌 *Invitación a Tecda 3°*\n¡Hola! Te invito a unirte a nuestro espacio de trabajo: *${workspaceName}*\n\n🔗 *Link de la aplicación:* ${APP_URL}\n🔑 *Código de acceso:* \`${code}\`\n\n_Ingresá a la plataforma con el link de arriba y pegá este código en el botón "Unirse con Código" para entrar al tablero._`;
 
     try {
       await navigator.clipboard.writeText(mensajeCompleto);
-      setShowActiveLink(false); // Cierra la ventanita
-      alert("📋 ¡Mensaje completo copiado!\n\nYa podés pegarlo en WhatsApp. Tus colaboradores recibirán el link de la app y el código con la explicación de cómo usarlo.");
+      setShowActiveLink(false);
+      alert("📋 ¡Mensaje completo copiado!");
     } catch (err) {
       console.error(err);
     }
   };
 
-  // ==========================================
-  // RENDER INTERFAZ
-  // ==========================================
   if (!user) {
     return (
       <div className="auth-container" style={{ maxWidth: '400px', margin: '100px auto', padding: '30px', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#fff' }}>
