@@ -1,3 +1,0 @@
-- [TaskBoard auth-web lib fix](taskboard-auth-web-lib.md) — replit-auth-web lib can't use vite types; cast import.meta as unknown first.
-- [TaskBoard db lib exports](taskboard-db-exports.md) — @workspace/db exports tables via schema/index.ts re-exports; run typecheck:libs before leaf checks or api-server sees stale declarations.
-- [TaskBoard api-zod mobile schemas](taskboard-api-zod-mobile.md) — mobile auth schemas not auto-generated from openapi spec; define inline or avoid zod dependency (api-server has no direct zod dep).
