@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './index.css';
 
-// 🌐 CONFIGURACIÓN DE URL (Producción en Render - ¡No cambiar por Netlify!)
+// 🌐 CONFIGURACIÓN DE URL (Producción en Render)
 const API_URL = "https://tecda-backend.onrender.com";
 
 interface Task {
@@ -56,9 +56,10 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const fetchTasks = async () => {
     try {
       const res = await axios.get(`${API_URL}/tasks/${workspaceId}`);
+      console.log("📥 Tareas cargadas desde el servidor para este workspace:", res.data);
       setTasks(res.data);
     } catch (err) {
-      console.error("Error al cargar tareas:", err);
+      console.error("❌ Error al cargar tareas:", err);
     }
   };
 
@@ -67,16 +68,15 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
       const res = await axios.get(`${API_URL}/workspaces/${workspaceId}/members`);
       setMembers(res.data);
     } catch (err) {
-      console.error("Error al cargar miembros:", err);
+      console.error("❌ Error al cargar miembros:", err);
     }
   };
 
-  // ⚡ FUNCIÓN ARREGLADA SINCRO CON RENDER
+  // ⚡ FUNCIÓN CON DIAGNÓSTICO INCORPORADO
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    // Dejamos que el Backend maneje el ID para que no falle la inserción
     const taskData = {
       workspaceId,
       title: newTaskTitle.trim(),
@@ -89,16 +89,20 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     };
 
     try {
-      // Mandamos los datos limpios a Render
-      await axios.post(`${API_URL}/tasks`, taskData);
+      console.log("➡️ 1. Intentando enviar datos a Render:", taskData);
+      
+      const res = await axios.post(`${API_URL}/tasks`, taskData);
+      
+      console.log("✅ 2. Render respondió. Datos devueltos por el servidor:", res.data);
+
       setNewTaskTitle('');
       setTopAssignee(''); 
       
-      // Forzamos la actualización inmediata de las columnas
-      fetchTasks();
+      console.log("🔄 3. Ejecutando fetchTasks() para refrescar la pantalla...");
+      await fetchTasks();
+      
     } catch (err) {
-      console.error("Error al crear tarea:", err);
-      alert("No se pudo guardar la tarea en Render. Revisá los logs del backend.");
+      console.error("❌ Error atrapado en el bloque catch de handleAddTask:", err);
     }
   };
 
@@ -169,7 +173,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="board-container" style={{ width: '100%', overflowX: 'auto' }}>
       
-      {/* 🚀 BARRA SUPERIOR */}
+      {/* 🚀 BARRA SUPERIOR DE ACCIONES */}
       <div style={{ display: 'flex', gap: '30px', marginBottom: '25px', flexWrap: 'wrap', maxWidth: '1000px' }}>
         <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', flex: '1', minWidth: '350px' }}>
           <input 
@@ -291,7 +295,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
       </div>
 
-      {/* --- MODAL FLOTANTE --- */}
+      {/* --- MODAL FLOTANTE COMPLETO --- */}
       {selectedTask && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', width: '500px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 5px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
