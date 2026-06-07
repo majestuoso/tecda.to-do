@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import './index.css';
+
+// 🌐 CONFIGURACIÓN DE URL (Producción en Render)
+const API_URL = "https://tecda-backend.onrender.com";
 
 interface Task {
   id: string;
   title: string;
-  assignedTo: string; // Guardará el ID del usuario
-  status: string;
   description?: string;
-  links?: string[];
+  status: 'todo' | 'in_progress' | 'done';
 }
 
 interface Member {
@@ -17,336 +19,167 @@ interface Member {
   role: string;
 }
 
-const parseLinks = (links: any): string[] => {
-  if (Array.isArray(links)) return links;
-  if (typeof links === 'string') {
-    try { return JSON.parse(links); } catch { return []; }
-  }
-  return [];
-};
-
 export default function Board({ workspaceId }: { workspaceId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [members, setMembers] = useState<Member[]>([]); // <-- NUEVO: Integrantes del espacio
-  const [newTask, setNewTask] = useState({ title: '', assignedTo: '' });
-  const [colors, setColors] = useState({ todo: '#c8b400', 'in-progress': '#1a6fa8', done: '#1a8c52' });
+  const [members, setMembers] = useState<Member[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
 
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [panelData, setPanelData] = useState({ title: '', assignedTo: '', description: '', status: 'todo', links: [] as string[] });
-  const [newLink, setNewLink] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  // Cada vez que cambia el espacio de trabajo, cargamos tareas Y miembros
-  useEffect(() => { 
+  // Cargar tareas y miembros cuando cambia el espacio de trabajo
+  useEffect(() => {
     if (workspaceId) {
-      fetchTasks(); 
+      fetchTasks();
       fetchMembers();
-    } 
+    }
   }, [workspaceId]);
-
-  const normalizeTasks = (data: any[]): Task[] =>
-    data.map(t => ({
-      ...t,
-      assignedTo: t.assignedTo ?? t.assignedto ?? '',
-      links: parseLinks(t.links)
-    }));
 
   const fetchTasks = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/tasks/${workspaceId}`);
-      setTasks(normalizeTasks(res.data));
-    } catch (err) { console.error("Error al cargar tareas:", err); }
+      const res = await axios.get(`${API_URL}/tasks/${workspaceId}`);
+      setTasks(res.data);
+    } catch (err) {
+      console.error("Error al cargar tareas:", err);
+    }
   };
 
-  // NUEVO: Trae los usuarios invitados a este espacio desde el backend
   const fetchMembers = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/workspaces/${workspaceId}/members`);
+      const res = await axios.get(`${API_URL}/workspaces/${workspaceId}/members`);
       setMembers(res.data);
-    } catch (err) { console.error("Error al cargar miembros:", err); }
-  };
-
-  // Función auxiliar para buscar el nombre del usuario a partir de su ID
-  const getUserName = (userId: string) => {
-    const member = members.find(m => m.id === userId);
-    return member ? member.name : 'Sin asignar';
-  };
-
-  const addTask = async () => {
-    if (!newTask.title.trim()) return;
-    const task = { 
-      id: Date.now().toString(), 
-      project_id: workspaceId + '_p', 
-      title: newTask.title,
-      assignedTo: newTask.assignedTo || null, // Guarda el ID o null si no se eligió nadie
-      status: 'todo', 
-      description: '', 
-      links: [] 
-    };
-    await axios.post('http://localhost:5000/tasks', task);
-    setNewTask({ title: '', assignedTo: '' });
-    fetchTasks();
-  };
-
-  const openPanel = (task: Task) => {
-    setSelectedTask(task);
-    setPanelData({
-      title: task.title,
-      assignedTo: task.assignedTo || '',
-      description: task.description || '',
-      status: task.status,
-      links: parseLinks(task.links),
-    });
-    setNewLink('');
-  };
-
-  const closePanel = () => setSelectedTask(null);
-
-  const savePanel = async () => {
-    if (!selectedTask || saving) return;
-    const taskId = selectedTask.id;
-    
-    const dataToSend = {
-      title: panelData.title,
-      assignedTo: panelData.assignedTo, 
-      status: panelData.status,
-      description: panelData.description,
-      links: panelData.links
-    };
-
-    setSaving(true);
-    try {
-      await axios.patch(`http://localhost:5000/tasks/${taskId}`, dataToSend);
-
-      setTasks(prevTasks => {
-        return prevTasks.map(t =>
-          t.id === taskId 
-            ? { 
-                ...t, 
-                title: panelData.title, 
-                assignedTo: panelData.assignedTo, 
-                status: panelData.status,
-                description: panelData.description,
-                links: panelData.links 
-              } 
-            : t
-        );
-      });
-
-      closePanel();
-      
-      setTimeout(() => {
-        fetchTasks();
-      }, 100);
-
     } catch (err) {
-      console.error("Error al guardar la tarea:", err);
+      console.error("Error al cargar miembros:", err);
     }
-    setSaving(false);
   };
 
-  const addLink = () => {
-    const trimmed = newLink.trim();
-    if (!trimmed) return;
-    const url = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
-    setPanelData(prev => ({ ...prev, links: [...prev.links, url] }));
-    setNewLink('');
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+
+    const taskData = {
+      id: 't_' + Date.now().toString(),
+      workspaceId,
+      title: newTaskTitle.trim(),
+      status: 'todo'
+    };
+
+    try {
+      await axios.post(`${API_URL}/tasks`, taskData);
+      setNewTaskTitle('');
+      fetchTasks();
+    } catch (err) {
+      console.error("Error al crear tarea:", err);
+    }
   };
 
-  const removeLink = (idx: number) => {
-    setPanelData(prev => ({ ...prev, links: prev.links.filter((_, i) => i !== idx) }));
+  const handleUpdateStatus = async (taskId: string, currentStatus: string) => {
+    let nextStatus: 'todo' | 'in_progress' | 'done' = 'todo';
+    if (currentStatus === 'todo') nextStatus = 'in_progress';
+    else if (currentStatus === 'in_progress') nextStatus = 'done';
+    else if (currentStatus === 'done') nextStatus = 'todo';
+
+    try {
+      await axios.patch(`${API_URL}/tasks/${taskId}`, { status: nextStatus });
+      fetchTasks();
+    } catch (err) {
+      console.error("Error al actualizar estado:", err);
+    }
   };
 
-  const changeStatus = async (id: string, status: string) => {
-    await axios.patch(`http://localhost:5000/tasks/${id}`, { status });
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("¿Seguro que querés eliminar esta tarea?")) return;
+    try {
+      await axios.delete(`${API_URL}/tasks/${taskId}`);
+      fetchTasks();
+    } catch (err) {
+      console.error("Error al eliminar tarea:", err);
+    }
   };
 
-  const deleteTask = async (id: string) => {
-    await axios.delete(`http://localhost:5000/tasks/${id}`);
-    if (selectedTask?.id === id) closePanel();
-    setTasks(prev => prev.filter(t => t.id !== id));
-  };
-
-  const statusLabel: Record<string, string> = {
-    todo: 'Hacer', 'in-progress': 'En curso', done: 'Hecho',
-  };
-  const columnLabel: Record<string, string> = {
-    todo: 'HACER', 'in-progress': 'EN CURSO', done: 'HECHO',
-  };
+  // Filtrar tareas por columnas
+  const todoTasks = tasks.filter(t => t.status === 'todo');
+  const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
+  const doneTasks = tasks.filter(t => t.status === 'done');
 
   return (
-    <div className="board-wrapper">
-      {/* FORMULARIO DE ALTA DE TAREAS MODIFICADO */}
-      <div className="task-form-container">
-        <input
-          placeholder="Nombre de la tarea"
-          value={newTask.title}
-          onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-          onKeyDown={e => e.key === 'Enter' && addTask()}
-        />
-        
-        {/* REEMPLAZO: Selector desplegable de integrantes para asignar al crear */}
-        <select
-          value={newTask.assignedTo}
-          onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-        >
-          <option value="">Asignar integrante...</option>
-          {members.map(m => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
-        </select>
-        
-        <button onClick={addTask}>+ Agregar</button>
-      </div>
+    <div className="board-container">
+      {/* Sección superior: Agregar tarea y ver equipo */}
+      <div style={{ display: 'flex', gap: '40px', marginBottom: '25px', flexWrap: 'wrap' }}>
+        <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', flex: '1', minWidth: '300px' }}>
+          <input 
+            type="text" 
+            placeholder="Escribí una nueva tarea..." 
+            value={newTaskTitle}
+            onChange={e => setNewTaskTitle(e.target.value)}
+            style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
+          />
+          <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#1a6fa8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+            + Añadir
+          </button>
+        </form>
 
-      <div className="board-grid">
-        {['todo', 'in-progress', 'done'].map(status => (
-          <div key={status} className="column" style={{ backgroundColor: colors[status as keyof typeof colors] }}>
-            <div className="column-header">
-              <h3>{columnLabel[status]}</h3>
-              <input
-                type="color"
-                value={colors[status as keyof typeof colors]}
-                onChange={e => setColors({ ...colors, [status]: e.target.value })}
-              />
-            </div>
-            <div className="tasks-list">
-              {tasks.filter(t => t.status === status).map(t => (
-                <div
-                  key={`${t.id}-${t.assignedTo}`}
-                  className={`task-card ${selectedTask?.id === t.id ? 'task-card--active' : ''}`}
-                  onClick={() => openPanel(t)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="task-content">
-                    <div style={{ width: '100%' }}>
-                      <strong>{t.title}</strong><br />
-                      {/* TRUCO: Mostramos el nombre real del usuario usando su ID */}
-                      <small>👤 {getUserName(t.assignedTo)}</small>
-                      {(t.description || (t.links && t.links.length > 0)) && (
-                        <div className="task-meta-icons">
-                          {t.description && <span title="Tiene descripción">📝</span>}
-                          {t.links && t.links.length > 0 && <span title={`${t.links.length} enlace(s)`}>🔗 {t.links.length}</span>}
-                        </div>
-                      )}
-                    </div>
-                    <div className="card-actions" onClick={e => e.stopPropagation()}>
-                      <select value={t.status} onChange={e => changeStatus(t.id, e.target.value)}>
-                        <option value="todo">Hacer</option>
-                        <option value="in-progress">En curso</option>
-                        <option value="done">Hecho</option>
-                      </select>
-                      <button className="delete-btn" onClick={() => deleteTask(t.id)}>🗑️</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {selectedTask && (
-        <>
-          <div className="panel-overlay" onClick={closePanel} />
-          <div className="task-panel">
-            <div className="panel-header">
-              <span
-                className="panel-status-badge"
-                style={{ backgroundColor: colors[panelData.status as keyof typeof colors] }}
-              >
-                {statusLabel[panelData.status] || panelData.status}
+        <div className="members-box" style={{ padding: '10px 15px', backgroundColor: '#f9f9f9', borderRadius: '6px', border: '1px solid #ddd', minWidth: '25px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#555' }}>👥 Equipo en este espacio:</span>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
+            {members.map(m => (
+              <span key={m.id} title={m.email} style={{ padding: '3px 8px', backgroundColor: '#e2e8f0', borderRadius: '12px', fontSize: '12px', color: '#4a5568' }}>
+                {m.name}
               </span>
-              <button className="panel-close-btn" onClick={closePanel}>✕</button>
-            </div>
-
-            <div className="panel-section">
-              <label className="panel-label">Título</label>
-              <input
-                className="panel-input"
-                value={panelData.title}
-                onChange={e => setPanelData({ ...panelData, title: e.target.value })}
-              />
-            </div>
-
-            {/* REEMPLAZO: Selector desplegable de responsables dentro del panel lateral */}
-            <div className="panel-section">
-              <label className="panel-label">Responsable</label>
-              <select
-                className="panel-select"
-                value={panelData.assignedTo}
-                onChange={e => setPanelData({ ...panelData, assignedTo: e.target.value })}
-                style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
-              >
-                <option value="">Sin asignar</option>
-                {members.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="panel-section">
-              <label className="panel-label">Estado</label>
-              <select
-                className="panel-select"
-                value={panelData.status}
-                onChange={e => setPanelData({ ...panelData, status: e.target.value })}
-              >
-                <option value="todo">Hacer</option>
-                <option value="in-progress">En curso</option>
-                <option value="done">Hecho</option>
-              </select>
-            </div>
-
-            <div className="panel-section">
-              <label className="panel-label">Descripción / Notas</label>
-              <textarea
-                className="panel-textarea"
-                placeholder="Agregá notas, contexto, instrucciones..."
-                value={panelData.description}
-                onChange={e => setPanelData({ ...panelData, description: e.target.value })}
-                rows={5}
-              />
-            </div>
-
-            <div className="panel-section">
-              <label className="panel-label">🔗 Enlaces</label>
-              <div className="link-input-row">
-                <input
-                  className="panel-input"
-                  placeholder="Pegá una URL..."
-                  value={newLink}
-                  onChange={e => setNewLink(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addLink()}
-                />
-                <button className="link-add-btn" onClick={addLink}>+ Agregar</button>
-              </div>
-              <div className="links-list">
-                {panelData.links.map((link, idx) => (
-                  <div key={idx} className="link-item">
-                    <a href={link} target="_blank" rel="noopener noreferrer" className="link-url">{link}</a>
-                    <button className="link-remove-btn" onClick={() => removeLink(idx)}>✕</button>
-                  </div>
-                ))}
-                {panelData.links.length === 0 && <p className="no-links">No hay enlaces todavía</p>}
-              </div>
-            </div>
-
-            <div className="panel-footer">
-              <button 
-                type="button"
-                className="panel-save-btn"
-                onClick={savePanel}
-                disabled={saving}
-              >
-                {saving ? 'Guardando...' : '💾 Guardar y cerrar'}
-              </button>
-            </div>
+            ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
+
+      {/* Columnas del Tablero Kanban */}
+      <div className="kanban-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+        
+        {/* Columna: Por Hacer */}
+        <div className="kanban-column" style={{ backgroundColor: '#ebecf0', padding: '15px', borderRadius: '8px', minHeight: '400px' }}>
+          <h3 style={{ marginBottom: '15px', color: '#c0392b' }}>🔴 Por Hacer ({todoTasks.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {todoTasks.map(t => (
+              <div key={t.id} className="task-card" style={{ backgroundColor: '#fff', padding: '12px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 500 }}>{t.title}</span>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <button title="Mover a En Proceso" onClick={() => handleUpdateStatus(t.id, t.status)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>👉</button>
+                  <button title="Eliminar" onClick={() => handleDeleteTask(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Columna: En Proceso */}
+        <div className="kanban-column" style={{ backgroundColor: '#ebecf0', padding: '15px', borderRadius: '8px', minHeight: '400px' }}>
+          <h3 style={{ marginBottom: '15px', color: '#d35400' }}>🟠 En Proceso ({inProgressTasks.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {inProgressTasks.map(t => (
+              <div key={t.id} className="task-card" style={{ backgroundColor: '#fff', padding: '12px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 500 }}>{t.title}</span>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <button title="Mover a Terminado" onClick={() => handleUpdateStatus(t.id, t.status)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>👉</button>
+                  <button title="Eliminar" onClick={() => handleDeleteTask(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Columna: Terminado */}
+        <div className="kanban-column" style={{ backgroundColor: '#ebecf0', padding: '15px', borderRadius: '8px', minHeight: '400px' }}>
+          <h3 style={{ marginBottom: '15px', color: '#27ae60' }}>🟢 Terminado ({doneTasks.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {doneTasks.map(t => (
+              <div key={t.id} className="task-card" style={{ backgroundColor: '#fff', padding: '12px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: '4px solid #27ae60' }}>
+                <span style={{ fontSize: '14px', fontWeight: 500, textDecoration: 'line-through', color: '#7f8c8d' }}>{t.title}</span>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <button title="Reiniciar tarea" onClick={() => handleUpdateStatus(t.id, t.status)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>🔄</button>
+                  <button title="Eliminar" onClick={() => handleDeleteTask(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
