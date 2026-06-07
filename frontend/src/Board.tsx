@@ -1,133 +1,210 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import './index.css';
 
+// 🌐 URL de tu backend en Render
 const API_URL = "https://tecda-backend.onrender.com";
 
+interface Task {
+  id: string;
+  title: string;
+  assignedTo: string;
+  status: string;
+  description?: string;
+  links?: string[];
+}
+
+const parseLinks = (links: any): string[] => {
+  if (Array.isArray(links)) return links;
+  if (typeof links === 'string') {
+    try { return JSON.parse(links); } catch { return []; }
+  }
+  return [];
+};
+
 export default function Board({ workspaceId }: { workspaceId: string }) {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [topAssignee, setTopAssignee] = useState('');
-  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [newTask, setNewTask] = useState({ title: '', assignedTo: '' });
+  const [colors, setColors] = useState({ todo: '#c8b400', 'in-progress': '#1a6fa8', done: '#1a8c52' });
 
-  // Estados del Modal
-  const [modalDesc, setModalDesc] = useState('');
-  const [modalStatus, setModalStatus] = useState('todo');
-  const [modalColor, setModalColor] = useState('#ffffff');
-  const [modalAssignee, setModalAssignee] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [panelData, setPanelData] = useState({ title: '', assignedTo: '', description: '', status: 'todo', links: [] as string[] });
+  const [newLink, setNewLink] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (workspaceId) loadData();
-  }, [workspaceId]);
+  useEffect(() => { if (workspaceId) fetchTasks(); }, [workspaceId]);
 
-  const loadData = async () => {
+  const normalizeTasks = (data: any[]): Task[] =>
+    data.map(t => ({
+      ...t,
+      assignedTo: t.assignedTo ?? t.assignedto ?? '',
+      links: parseLinks(t.links)
+    }));
+
+  const fetchTasks = async () => {
     try {
-      const [tRes, mRes] = await Promise.all([
-        axios.get(`${API_URL}/tasks/${workspaceId}`),
-        axios.get(`${API_URL}/workspaces/${workspaceId}/members`)
-      ]);
-      setTasks(tRes.data || []);
-      setMembers(mRes.data || []);
-    } catch (err) { console.error(err); }
+      const res = await axios.get(`${API_URL}/tasks/${workspaceId}`);
+      setTasks(normalizeTasks(res.data));
+    } catch (err) { console.error("Error al cargar tareas:", err); }
   };
 
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
+  const addTask = async () => {
+    if (!newTask.title.trim()) return;
+    const task = { id: Date.now().toString(), project_id: workspaceId + '_p', ...newTask, status: 'todo', description: '', links: [] };
+    await axios.post(`${API_URL}/tasks`, task);
+    setNewTask({ title: '', assignedTo: '' });
+    fetchTasks();
+  };
 
-    const newTask = {
-      id: 'tmp_' + Date.now(),
-      workspaceId,
-      title: newTaskTitle.trim(),
-      status: 'todo',
-      color: '#ffffff',
-      assignedTo: topAssignee
+  const openPanel = (task: Task) => {
+    setSelectedTask(task);
+    setPanelData({
+      title: task.title,
+      assignedTo: task.assignedTo || '',
+      description: task.description || '',
+      status: task.status,
+      links: parseLinks(task.links),
+    });
+    setNewLink('');
+  };
+
+  const closePanel = () => setSelectedTask(null);
+
+  const savePanel = async () => {
+    if (!selectedTask || saving) return;
+    const taskId = selectedTask.id;
+    
+    const dataToSend = {
+      title: panelData.title,
+      assignedTo: panelData.assignedTo, 
+      status: panelData.status,
+      description: panelData.description,
+      links: panelData.links
     };
 
-    // 1. Actualización visual instantánea
-    setTasks(prev => [...prev, newTask]);
-    setNewTaskTitle('');
-    setTopAssignee('');
-
-    // 2. Persistencia en servidor
+    setSaving(true);
     try {
-      await axios.post(`${API_URL}/tasks`, newTask);
-      loadData(); // Refresca para obtener el ID real de DB
-    } catch (err) { console.error("Error al persistir:", err); }
+      await axios.patch(`${API_URL}/tasks/${taskId}`, dataToSend);
+
+      setTasks(prevTasks => {
+        return prevTasks.map(t =>
+          t.id === taskId 
+            ? { ...t, title: panelData.title, assignedTo: panelData.assignedTo, status: panelData.status, description: panelData.description, links: panelData.links } 
+            : t
+        );
+      });
+
+      closePanel();
+      
+      setTimeout(() => { fetchTasks(); }, 100);
+    } catch (err) { console.error("Error al guardar la tarea:", err); }
+    setSaving(false);
   };
 
-  const handleUpdateStatus = async (taskId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'todo' ? 'in_progress' : currentStatus === 'in_progress' ? 'done' : 'todo';
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: nextStatus } : t));
-    try { await axios.patch(`${API_URL}/tasks/${taskId}`, { status: nextStatus }); } 
-    catch (err) { console.error(err); }
+  const addLink = () => {
+    const trimmed = newLink.trim();
+    if (!trimmed) return;
+    const url = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+    setPanelData(prev => ({ ...prev, links: [...prev.links, url] }));
+    setNewLink('');
   };
 
-  const handleDeleteTask = async (taskId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTasks(prev => prev.filter(t => t.id !== taskId));
-    try { await axios.delete(`${API_URL}/tasks/${taskId}`); } 
-    catch (err) { console.error(err); }
+  const removeLink = (idx: number) => {
+    setPanelData(prev => ({ ...prev, links: prev.links.filter((_, i) => i !== idx) }));
   };
 
-  const openModal = (t: any) => {
-    setSelectedTask(t);
-    setModalDesc(t.description || '');
-    setModalStatus(t.status);
-    setModalColor(t.color || '#ffffff');
-    setModalAssignee(t.assignedTo || '');
+  const changeStatus = async (id: string, status: string) => {
+    await axios.patch(`${API_URL}/tasks/${id}`, { status });
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
   };
 
-  const saveModal = async () => {
-    setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, description: modalDesc, status: modalStatus, color: modalColor, assignedTo: modalAssignee } : t));
-    try {
-      await axios.patch(`${API_URL}/tasks/${selectedTask.id}`, { description: modalDesc, status: modalStatus, color: modalColor, assignedTo: modalAssignee });
-      setSelectedTask(null);
-    } catch (err) { console.error(err); }
+  const deleteTask = async (id: string) => {
+    await axios.delete(`${API_URL}/tasks/${id}`);
+    if (selectedTask?.id === id) closePanel();
+    setTasks(prev => prev.filter(t => t.id !== id));
   };
+
+  const statusLabel: Record<string, string> = { todo: 'Hacer', 'in-progress': 'En curso', done: 'Hecho' };
+  const columnLabel: Record<string, string> = { todo: 'HACER', 'in-progress': 'EN CURSO', done: 'HECHO' };
 
   return (
-    <div className="board-container" style={{ padding: '20px' }}>
-      <form onSubmit={handleAddTask} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-        <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Nueva tarea..." style={{ padding: '8px', flex: 1 }} />
-        <select value={topAssignee} onChange={e => setTopAssignee(e.target.value)}>
-          <option value="">Asignar a...</option>
-          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-        <button type="submit">+ Añadir</button>
-      </form>
+    <div className="board-wrapper">
+      <div className="task-form-container">
+        <input placeholder="Nombre de la tarea" value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} onKeyDown={e => e.key === 'Enter' && addTask()} />
+        <input placeholder="Responsable" value={newTask.assignedTo} onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })} onKeyDown={e => e.key === 'Enter' && addTask()} />
+        <button onClick={addTask}>+ Agregar</button>
+      </div>
 
-      <div style={{ display: 'flex', gap: '20px' }}>
-        {['todo', 'in_progress', 'done'].map(status => (
-          <div key={status} style={{ width: '300px', background: '#ebecf0', padding: '10px', minHeight: '400px' }}>
-            <h3>{status.toUpperCase()}</h3>
-            {tasks.filter(t => t.status === status).map(t => (
-              <div key={t.id} onClick={() => openModal(t)} style={{ background: t.color || '#fff', margin: '5px 0', padding: '10px', cursor: 'pointer', borderRadius: '4px' }}>
-                {t.title}
-                <button onClick={(e) => handleDeleteTask(t.id, e)}>🗑️</button>
-                <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(t.id, t.status); }}>👉</button>
-              </div>
-            ))}
+      <div className="board-grid">
+        {['todo', 'in-progress', 'done'].map(status => (
+          <div key={status} className="column" style={{ backgroundColor: colors[status as keyof typeof colors] }}>
+            <div className="column-header">
+              <h3>{columnLabel[status]}</h3>
+              <input type="color" value={colors[status as keyof typeof colors]} onChange={e => setColors({ ...colors, [status]: e.target.value })} />
+            </div>
+            <div className="tasks-list">
+              {tasks.filter(t => t.status === status).map(t => (
+                <div key={`${t.id}-${t.assignedTo}`} className={`task-card ${selectedTask?.id === t.id ? 'task-card--active' : ''}`} onClick={() => openPanel(t)} style={{ cursor: 'pointer' }}>
+                  <div className="task-content">
+                    <div style={{ width: '100%' }}>
+                      <strong>{t.title}</strong><br />
+                      <small>👤 {t.assignedTo || 'Sin asignar'}</small>
+                    </div>
+                    <div className="card-actions" onClick={e => e.stopPropagation()}>
+                      <select value={t.status} onChange={e => changeStatus(t.id, e.target.value)}>
+                        <option value="todo">Hacer</option>
+                        <option value="in-progress">En curso</option>
+                        <option value="done">Hecho</option>
+                      </select>
+                      <button className="delete-btn" onClick={() => deleteTask(t.id)}>🗑️</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
 
       {selectedTask && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ background: '#fff', padding: '20px', width: '400px', borderRadius: '8px' }}>
-            <h2>Editar Tarea</h2>
-            <input value={modalDesc} onChange={e => setModalDesc(e.target.value)} placeholder="Descripción" style={{ width: '100%', marginBottom: '10px' }} />
-            <select value={modalStatus} onChange={e => setModalStatus(e.target.value)} style={{ width: '100%', marginBottom: '10px' }}>
-              <option value="todo">Por Hacer</option>
-              <option value="in_progress">En Proceso</option>
-              <option value="done">Terminado</option>
-            </select>
-            <input type="color" value={modalColor} onChange={e => setModalColor(e.target.value)} />
-            <button onClick={saveModal}>Guardar Cambios</button>
-            <button onClick={() => setSelectedTask(null)}>Cerrar</button>
+        <>
+          <div className="panel-overlay" onClick={closePanel} />
+          <div className="task-panel">
+            {/* Panel de edición */}
+            <div className="panel-header">
+              <span className="panel-status-badge" style={{ backgroundColor: colors[panelData.status as keyof typeof colors] }}>{statusLabel[panelData.status] || panelData.status}</span>
+              <button className="panel-close-btn" onClick={closePanel}>✕</button>
+            </div>
+            <div className="panel-section">
+              <label>Título</label>
+              <input className="panel-input" value={panelData.title} onChange={e => setPanelData({ ...panelData, title: e.target.value })} />
+            </div>
+            <div className="panel-section">
+              <label>Responsable</label>
+              <input className="panel-input" value={panelData.assignedTo} onChange={e => setPanelData({ ...panelData, assignedTo: e.target.value })} />
+            </div>
+            <div className="panel-section">
+              <label>Estado</label>
+              <select className="panel-select" value={panelData.status} onChange={e => setPanelData({ ...panelData, status: e.target.value })}>
+                <option value="todo">Hacer</option>
+                <option value="in-progress">En curso</option>
+                <option value="done">Hecho</option>
+              </select>
+            </div>
+            <div className="panel-section">
+              <label>Descripción</label>
+              <textarea className="panel-textarea" value={panelData.description} onChange={e => setPanelData({ ...panelData, description: e.target.value })} rows={5} />
+            </div>
+            <div className="panel-section">
+              <label>🔗 Enlaces</label>
+              <input className="panel-input" placeholder="Pegá URL..." value={newLink} onChange={e => setNewLink(e.target.value)} onKeyDown={e => e.key === 'Enter' && addLink()} />
+              <button onClick={addLink}>+ Agregar</button>
+              {panelData.links.map((link, idx) => (
+                <div key={idx} className="link-item"><a href={link} target="_blank" rel="noopener noreferrer">{link}</a><button onClick={() => removeLink(idx)}>✕</button></div>
+              ))}
+            </div>
+            <button className="panel-save-btn" onClick={savePanel} disabled={saving}>{saving ? 'Guardando...' : '💾 Guardar'}</button>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
