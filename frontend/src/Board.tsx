@@ -11,9 +11,9 @@ interface Task {
   description?: string;
   status: 'todo' | 'in_progress' | 'done';
   color?: string;
-  assignedTo?: string;
-  link?: string;      // 🔗 Enlace guardado
-  fileUrl?: string;   // 📁 Archivo adjunto
+  assignedTo?: string; // ID del miembro asignado según el modelo del Backend
+  link?: string;      
+  fileUrl?: string;   
 }
 
 interface Member {
@@ -33,12 +33,12 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
   const [progressBg, setProgressBg] = useState('#ebecf0');
   const [doneBg, setDoneBg] = useState('#ebecf0');
 
-  // --- ESTADOS AMPLIADOS PARA LA VENTANA FLOTANTE (MODAL GRANDE) ---
+  // --- ESTADOS PARA EL MODAL DE EDICIÓN ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalDescription, setModalDescription] = useState('');
   const [modalStatus, setModalStatus] = useState<'todo' | 'in_progress' | 'done'>('todo');
   const [modalColor, setModalColor] = useState('#ffffff');
-  const [modalAssignee, setModalAssignee] = useState('');
+  const [modalAssignee, setModalAssignee] = useState(''); // Maneja el id del miembro elegido
   const [modalLink, setModalLink] = useState('');
   const [modalFile, setModalFile] = useState<File | null>(null);
 
@@ -81,7 +81,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
       status: 'todo',
       color: '#ffffff',
       description: '',
-      assignedTo: '',
+      assignedTo: '', // Se crea inicialmente sin nadie asignado
       link: '',
       fileUrl: ''
     };
@@ -126,33 +126,33 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
     setModalDescription(task.description || '');
     setModalStatus(task.status);
     setModalColor(task.color || '#ffffff');
-    setModalAssignee(task.assignedTo || '');
+    setModalAssignee(task.assignedTo || ''); // Mapea el ID de asignación guardado
     setModalLink(task.link || '');
-    setModalFile(null); // Resetea el input de archivo al abrir
+    setModalFile(null);
   };
 
   const handleSaveModalChanges = async () => {
     if (!selectedTask) return;
     try {
-      // Simulación de carga/manejador de archivo si se adjunta uno nuevo
       let finalFileUrl = selectedTask.fileUrl || '';
       if (modalFile) {
         finalFileUrl = `📁 Adjunto: ${modalFile.name}`; 
       }
 
+      // Sincronizamos los nombres exactos de los campos con lo que Render espera recibir
       await axios.patch(`${API_URL}/tasks/${selectedTask.id}`, {
         description: modalDescription,
         status: modalStatus,
         color: modalColor,
-        assignedTo: modalAssignee,
+        assignedTo: modalAssignee, // Pasamos el ID seleccionado al Backend
         link: modalLink,
         fileUrl: finalFileUrl
       });
       
       setSelectedTask(null);
-      fetchTasks();
+      fetchTasks(); // Volvemos a pedir las tareas actualizadas a Render
     } catch (err) {
-      console.error("Error al guardar detalles:", err);
+      console.error("Error al guardar detalles de la tarea:", err);
     }
   };
 
@@ -211,7 +211,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
                       <button title="Eliminar" onClick={(e) => handleDeleteTask(t.id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '2px' }}>🗑️</button>
                     </div>
                   </div>
-                  {assignedUser && <small style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>👤 {assignedUser.name}</small>}
+                  {assignedUser && <small style={{ fontSize: '11px', color: '#2c3e50', fontWeight: 'bold', marginTop: '4px' }}>👤 Asignado: {assignedUser.name}</small>}
                 </div>
               );
             })}
@@ -237,7 +237,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
                       <button title="Eliminar" onClick={(e) => handleDeleteTask(t.id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '2px' }}>🗑️</button>
                     </div>
                   </div>
-                  {assignedUser && <small style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>👤 {assignedUser.name}</small>}
+                  {assignedUser && <small style={{ fontSize: '11px', color: '#2c3e50', fontWeight: 'bold', marginTop: '4px' }}>👤 Asignado: {assignedUser.name}</small>}
                 </div>
               );
             })}
@@ -263,7 +263,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
                       <button title="Eliminar" onClick={(e) => handleDeleteTask(t.id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '2px' }}>🗑️</button>
                     </div>
                   </div>
-                  {assignedUser && <small style={{ fontSize: '10px', color: '#7f8c8d', fontStyle: 'italic' }}>👤 {assignedUser.name}</small>}
+                  {assignedUser && <small style={{ fontSize: '11px', color: '#7f8c8d', fontStyle: 'italic', marginTop: '4px' }}>👤 Responsable: {assignedUser.name}</small>}
                 </div>
               );
             })}
@@ -272,9 +272,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
 
       </div>
 
-      {/* ==========================================================
-          💻 MODAL FLOTANTE FORMATO GRANDE (PRODUCCIÓN COMPLETO)
-          ========================================================== */}
+      {/* --- MODAL FLOTANTE FORMATO GRANDE --- */}
       {selectedTask && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', width: '500px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 5px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -288,14 +286,14 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               {selectedTask.title}
             </div>
 
-            {/* FILA 1: Asignar Miembro y Cambiar Estado */}
+            {/* SELECCIÓN DE MIEMBRO Y ESTADO */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Asignar a:</label>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>👤 Asignar a un colaborador:</label>
                 <select 
                   value={modalAssignee}
                   onChange={e => setModalAssignee(e.target.value)}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff' }}
+                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', backgroundColor: '#fff', color: '#333' }}
                 >
                   <option value="">Sin asignar (Nadie)</option>
                   {members.map(m => (
@@ -305,7 +303,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📊 Estado actual:</label>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📊 Estado de la actividad:</label>
                 <select 
                   value={modalStatus}
                   onChange={e => setModalStatus(e.target.value as 'todo' | 'in_progress' | 'done')}
@@ -318,19 +316,19 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               </div>
             </div>
 
-            {/* CAMPO: Notas y Descripciones Ampliadas */}
+            {/* CAMPO: Notas */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📝 Notas / Detalles de la actividad:</label>
               <textarea 
                 rows={4}
-                placeholder="Escribí notas detalladas, requerimientos o comentarios sobre el avance de esta tarea..."
+                placeholder="Escribí notas detalladas, requerimientos o comentarios..."
                 value={modalDescription}
                 onChange={e => setModalDescription(e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', fontSize: '13px', lineHeight: '1.4' }}
               />
             </div>
 
-            {/* CAMPO: Pegar Enlaces */}
+            {/* CAMPO: Enlaces */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🔗 Pegar Enlace externo (Drive, GitHub, Webs):</label>
               <input 
@@ -342,7 +340,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               />
             </div>
 
-            {/* CAMPO GRANDE: Adjuntar Archivos */}
+            {/* CAMPO: Adjuntar Archivos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: '#f8f9fa', padding: '12px', borderRadius: '6px', border: '1px dashed #ccc' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>📁 Adjuntar documento o captura (Formato Grande):</label>
               <input 
@@ -361,7 +359,7 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
               )}
             </div>
 
-            {/* CAMPO: Color de fondo */}
+            {/* CAMPO: Color */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555' }}>🎨 Color de tarjeta:</label>
               <input 
@@ -370,7 +368,6 @@ export default function Board({ workspaceId }: { workspaceId: string }) {
                 onChange={e => setModalColor(e.target.value)}
                 style={{ width: '40px', height: '30px', padding: 0, border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}
               />
-              <span style={{ fontSize: '12px', color: '#666' }}>Personalizar etiqueta visual</span>
             </div>
 
             {/* Botonera inferior */}
