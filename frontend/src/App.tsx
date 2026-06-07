@@ -5,7 +5,7 @@ import './index.css';
 
 // 🌐 CONFIGURACIÓN DE URLS (Producción en internet)
 const APP_URL = "https://tecda-workspace.netlify.app"; 
-const API_URL = "http://localhost:5000"; // Cambialo por el link de Render cuando lo tengamos
+const API_URL = "https://tecda-backend.onrender.com"; // Cambialo por el link de Render cuando lo tengamos
 
 export default function App() {
   // --- ESTADOS DE AUTENTICACIÓN Y SESIÓN ---
